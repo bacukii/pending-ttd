@@ -1,0 +1,20 @@
+{
+  "name": "Pending TTD",
+  "short_name": "Pending TTD",
+  "description": "Pencatat resi dan foto bukti pengantaran pending TTD untuk kurir",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#dc2626",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

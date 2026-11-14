@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#dc2626" />
+  <title>Pending TTD</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col select-none antialiased">
+
+  <!-- Header Sticky -->
+  <header class="sticky top-0 z-30 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3">
+    <div class="max-w-lg mx-auto flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-red-600 flex items-center justify-center font-black text-white text-sm shadow">
+          TTD
+        </div>
+        <div>
+          <h1 class="text-base font-bold leading-tight">Pending TTD</h1>
+          <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
+            <span id="netDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="netLabel">Siap Offline</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btnExportText" type="button" title="Salin Rekap Teks"
+          class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 active:scale-95 transition">
+          Rekap Teks
+        </button>
+        <div class="px-3 py-1.5 rounded-lg bg-red-600/20 border border-red-500/40 text-red-300 text-xs font-bold">
+          <span id="headerPendingCount">0</span> Pending
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Konten Utama -->
+  <main class="flex-1 max-w-lg w-full mx-auto px-4 pt-4 pb-28">
+
+    <!-- VIEW 1: INPUT LAPANGAN -->
+    <section id="viewInput" class="space-y-4">
+
+      <!-- Sakelar Mode Lock Multi-Paket & Multi-Foto -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-white">Lock 1 Penerima (Multi-Paket)</span>
+            <span id="lockBadge" class="hidden px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              Aktif
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Scan banyak resi &amp; pilih banyak foto sekaligus dalam 1 grup penerima.
+          </p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+          <input id="toggleLockMode" type="checkbox" class="sr-only peer" />
+          <div class="w-12 h-7 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+        </label>
+      </div>
+
+      <!-- Langkah 1: Scan / Input Resi -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-slate-200">1. Nomor Resi Paket</h2>
+          <span id="draftWaybillCount" class="text-xs font-semibold text-red-400">0 Resi</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <button id="btnOpenScanner" type="button"
+            class="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm shadow-lg shadow-red-950/50 active:scale-95 transition">
+            <span>Scan Barcode / QR</span>
+          </button>
+
+          <label class="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-700 cursor-pointer active:scale-95 transition">
+            <span>Scan dari Galeri</span>
+            <input id="inputScanGallery" type="file" accept="image/*" class="hidden" />
+          </label>
+        </div>
+
+        <p id="galleryScanStatus" class="hidden text-xs text-amber-300 bg-amber-950/50 border border-amber-800/60 rounded-lg px-3 py-2"></p>
+
+        <!-- Input Manual & Clipboard -->
+        <div class="space-y-2 pt-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-400">Input manual / tempel resi</span>
+            <button type="button" id="btnPasteWaybill" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs font-semibold text-sky-300 border border-slate-700 active:bg-slate-700">
+              Tempel Clipboard
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <input id="inputManualWaybill" type="text" placeholder="Ketik / tempel resi (mis. JY2167605792)"
+              class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono uppercase tracking-wider text-white placeholder-slate-500 focus:outline-none focus:border-red-500" />
+            <button id="btnAddManualWaybill" type="button"
+              class="px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm active:scale-95 transition">
+              + Tambah
+            </button>
+          </div>
+        </div>
+
+        <!-- Daftar Resi Terkumpul di Draf -->
+        <div id="draftWaybillList" class="space-y-2 pt-1"></div>
+      </div>
+
+      <!-- Langkah 2: Catatan & Foto Penerima -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-slate-200">2. Foto Penerima / Lokasi Titip</h2>
+          <span id="draftPhotoCount" class="text-xs font-semibold text-emerald-400">0 Foto</span>
+        </div>
+
+        <input id="inputRecipient" type="text" placeholder="Nama penerima / patokan rumah (opsional)"
+          class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500" />
+
+        <!-- Tombol Kamera Langsung & Upload Galeri -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <label class="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm cursor-pointer shadow-lg shadow-emerald-950/40 active:scale-95 transition">
+            <span>Ambil Foto Kamera</span>
+            <input id="inputCameraPhoto" type="file" accept="image/*" capture="environment" class="hidden" />
+          </label>
+
+          <label class="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-700 cursor-pointer active:scale-95 transition">
+            <span>Pilih dari Galeri</span>
+            <input id="inputGalleryPhoto" type="file" accept="image/*" class="hidden" />
+          </label>
+        </div>
+
+        <!-- Grid Preview Multi-Foto -->
+        <div id="draftPhotoPreviewWrap" class="hidden space-y-2 pt-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] text-slate-400">Ketuk foto untuk perbesar</span>
+            <button id="btnClearDraftPhotos" type="button" class="text-xs font-semibold text-red-400 hover:text-red-300">
+              Hapus Semua Foto
+            </button>
+          </div>
+          <div id="draftPhotoGrid" class="grid grid-cols-3 gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Tombol Simpan -->
+      <button id="btnSaveGroup" type="button"
+        class="w-full py-3.5 rounded-2xl bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-extrabold text-base shadow-xl shadow-red-950/60 active:scale-98 transition">
+        Simpan ke Antrean Pending TTD
+      </button>
+    </section>
+
+    <!-- VIEW 2: DAFTAR PENDING & SELESAI -->
+    <section id="viewList" class="hidden space-y-4">
+
+      <!-- Kontrol Mode Auto-Selesai & Pencarian -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <span class="text-xs font-bold text-slate-200 block">Auto-Selesai Setelah Salin Resi</span>
+            <span class="text-[11px] text-slate-400">Otomatis pindah ke Selesai saat semua resi penerima disalin</span>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer shrink-0">
+            <input id="toggleAutoComplete" type="checkbox" class="sr-only peer" />
+            <div class="w-11 h-6 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+          </label>
+        </div>
+
+        <input id="inputSearchResi" type="search" placeholder="Cari nomor resi atau nama penerima..."
+          class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500" />
+      </div>
+
+      <!-- Container Kartu Paket -->
+      <div id="groupCardsContainer" class="space-y-3.5"></div>
+    </section>
+
+  </main>
+
+  <!-- Modal Live Scanner -->
+  <div id="scannerModal" class="hidden fixed inset-0 z-50 bg-black flex flex-col">
+    <div class="flex items-center justify-between px-4 py-3 bg-slate-900/90 border-b border-slate-800">
+      <div>
+        <h3 class="text-sm font-bold text-white">Scan Barcode / QR Resi</h3>
+        <p id="scannerStatusText" class="text-[11px] text-slate-400">Arahkan kamera ke barcode atau QR label</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btnToggleTorch" type="button"
+          class="hidden px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-bold text-amber-300 border border-slate-700">
+          Senter
+        </button>
+        <button id="btnCloseScanner" type="button"
+          class="px-3 py-1.5 rounded-lg bg-red-600 text-xs font-bold text-white">
+          Selesai
+        </button>
+      </div>
+    </div>
+
+    <div class="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
+      <video id="scannerVideo" playsinline autoplay muted class="w-full h-full object-cover"></video>
+      <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center p-6">
+        <div class="w-full max-w-sm h-48 border-2 border-red-500 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] relative">
+          <div class="absolute inset-x-4 top-1/2 h-0.5 bg-red-500/80 animate-pulse"></div>
+        </div>
+        <p class="mt-4 text-xs text-slate-200 bg-slate-900/80 px-3 py-1.5 rounded-full">
+          Barcode bergaris/rusak? Tekan tombol OCR di bawah
+        </p>
+      </div>
+    </div>
+
+    <div class="p-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3">
+      <div class="text-xs">
+        <span class="text-slate-400 block">Terscan di sesi ini:</span>
+        <span id="modalScannedCount" class="font-bold text-emerald-400 text-sm">0 Resi</span>
+      </div>
+      <button id="btnCaptureOcr" type="button"
+        class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs active:scale-95 transition">
+        Baca Teks Resi (OCR)
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal Zoom Foto + Overlay Info Waktu & GPS -->
+  <div id="photoZoomModal" class="hidden fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-4">
+    <div class="flex items-center justify-between gap-2">
+      <button id="btnDownloadZoomed" type="button"
+        class="px-3.5 py-1.5 rounded-xl bg-slate-800 text-xs font-semibold text-sky-300 border border-slate-700">
+        Simpan ke Galeri
+      </button>
+      <button id="btnCloseZoom" type="button"
+        class="px-3.5 py-1.5 rounded-xl bg-slate-800 text-xs font-bold text-white border border-slate-700">
+        Tutup
+      </button>
+    </div>
+
+    <div class="flex-1 flex items-center justify-center my-3 overflow-hidden">
+      <img id="zoomedImg" alt="Foto Penerima" class="max-h-[75vh] max-w-full rounded-xl object-contain" />
+    </div>
+
+    <div id="zoomMetaOverlay" class="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 text-center"></div>
+  </div>
+
+  <!-- Toast Notifikasi + Undo -->
+  <div id="toastBar" class="hidden fixed bottom-20 inset-x-4 max-w-lg mx-auto z-40 bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3">
+    <span id="toastMessage" class="text-xs font-medium"></span>
+    <button id="btnToastUndo" type="button" class="hidden px-3 py-1 rounded-lg bg-amber-500 text-slate-950 text-xs font-extrabold shrink-0">
+      Urungkan
+    </button>
+  </div>
+
+  <!-- Bottom Navigation Bar -->
+  <nav class="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 backdrop-blur border-t border-slate-800">
+    <div class="max-w-lg mx-auto grid grid-cols-3">
+      <button type="button" data-tab="INPUT"
+        class="nav-tab py-3 flex flex-col items-center gap-0.5 text-red-400 font-bold text-xs border-t-2 border-red-500">
+        <span>+ Input Paket</span>
+      </button>
+      <button type="button" data-tab="PENDING"
+        class="nav-tab py-3 flex flex-col items-center gap-0.5 text-slate-400 font-semibold text-xs border-t-2 border-transparent">
+        <span>Pending (<span id="navPendingBadge">0</span>)</span>
+      </button>
+      <button type="button" data-tab="DONE"
+        class="nav-tab py-3 flex flex-col items-center gap-0.5 text-slate-400 font-semibold text-xs border-t-2 border-transparent">
+        <span>Selesai (<span id="navDoneBadge">0</span>)</span>
+      </button>
+    </div>
+  </nav>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
