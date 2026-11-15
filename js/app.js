@@ -101,10 +101,10 @@ const el = {
   btnCaptureOcr: document.getElementById('btnCaptureOcr'),
   // Zoom & Toast
   photoZoomModal: document.getElementById('photoZoomModal'),
+  zoomBackdropArea: document.getElementById('zoomBackdropArea'),
   zoomedImg: document.getElementById('zoomedImg'),
   zoomMetaOverlay: document.getElementById('zoomMetaOverlay'),
   btnDownloadZoomed: document.getElementById('btnDownloadZoomed'),
-  btnCloseZoom: document.getElementById('btnCloseZoom'),
   toastBar: document.getElementById('toastBar'),
   toastMessage: document.getElementById('toastMessage'),
   btnToastUndo: document.getElementById('btnToastUndo')
@@ -300,6 +300,7 @@ el.draftWaybillList.addEventListener('click', (e) => {
   persistDraftState();
 });
 
+// --- Zoom Foto & Integrasi Tombol Back Android ---
 function openPhotoZoom(photoObj, recipient, filename) {
   el.zoomedImg.src = getBlobUrl(photoObj.blob);
   const timeStr = formatTimestamp(photoObj.timestamp);
@@ -310,8 +311,38 @@ function openPhotoZoom(photoObj, recipient, filename) {
   ].filter(Boolean);
   el.zoomMetaOverlay.textContent = parts.join(' • ');
   state.zoomedPhoto = { blob: photoObj.blob, filename };
-  el.photoZoomModal.classList.remove('hidden');
+
+  if (el.photoZoomModal.classList.contains('hidden')) {
+    el.photoZoomModal.classList.remove('hidden');
+    history.pushState({ modal: 'photoZoom' }, '');
+  }
 }
+
+function hidePhotoZoomUI() {
+  el.photoZoomModal.classList.add('hidden');
+  state.zoomedPhoto = null;
+}
+
+function requestClosePhotoZoom() {
+  if (el.photoZoomModal.classList.contains('hidden')) return;
+  if (history.state && history.state.modal === 'photoZoom') {
+    history.back();
+  } else {
+    hidePhotoZoomUI();
+  }
+}
+
+window.addEventListener('popstate', () => {
+  if (!el.photoZoomModal.classList.contains('hidden')) {
+    hidePhotoZoomUI();
+  }
+});
+
+el.zoomBackdropArea.addEventListener('click', (e) => {
+  if (e.target === el.zoomBackdropArea) {
+    requestClosePhotoZoom();
+  }
+});
 
 el.draftPhotoGrid.addEventListener('click', (e) => {
   const removeBtn = e.target.closest('[data-remove-photo-idx]');
@@ -667,7 +698,6 @@ function renderGroupCards() {
     .map((group) => {
       const photos = getGroupPhotos(group);
       const isActiveCard = group.id === state.activeGroupId && group.status === 'PENDING';
-      const allWaybillsCopied = group.waybills.every((w) => w.copied);
 
       const dateStr = new Date(group.createdAt).toLocaleString('id-ID', {
         day: '2-digit',
@@ -738,8 +768,6 @@ function renderGroupCards() {
       <article id="card-${group.id}" class="bg-slate-900 rounded-2xl p-4 space-y-3 border-2 transition ${
         isActiveCard
           ? 'border-amber-500 shadow-lg shadow-amber-950/30'
-          : allWaybillsCopied && group.status === 'PENDING'
-          ? 'border-emerald-500/70'
           : 'border-slate-800'
       }">
         <!-- Header Kartu -->
@@ -779,12 +807,8 @@ function renderGroupCards() {
           ${
             group.status === 'PENDING'
               ? `<button type="button" data-action="mark-done" data-group-id="${group.id}"
-                  class="px-4 py-2 rounded-xl text-xs font-extrabold active:scale-95 transition ${
-                    allWaybillsCopied
-                      ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-950/50'
-                      : 'bg-slate-800 text-slate-300 border border-slate-700'
-                  }">
-                  Konfirmasi Sudah TTD
+                  class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 active:scale-95 transition">
+                  Tandai Selesai
                 </button>`
               : `<button type="button" data-action="reopen-group" data-group-id="${group.id}"
                   class="px-3 py-1.5 rounded-xl bg-slate-800 text-xs font-semibold text-amber-300 border border-slate-700">
@@ -797,7 +821,7 @@ function renderGroupCards() {
     .join('');
 }
 
-// Evaluasi Auto-Selesai saat semua resi dalam grup disalin
+// Evaluasi Auto-Selesai saat semua resi dalam grup disalin (hanya jika sakelar aktif)
 async function evaluateAutoComplete(group) {
   const allCopied = group.waybills.every((w) => w.copied);
   if (state.autoCompleteMode && allCopied && group.status === 'PENDING') {
@@ -854,7 +878,7 @@ el.groupCardsContainer.addEventListener('click', async (e) => {
     group.completedAt = Date.now();
     await saveGroup(group);
     await refreshGroups();
-    showToast('Ditandai Sudah TTD.', async () => {
+    showToast('Dipindahkan ke Selesai.', async () => {
       await saveGroup(prevSnapshot);
       await refreshGroups();
     });
@@ -888,16 +912,11 @@ el.btnDownloadZoomed.addEventListener('click', () => {
   showToast('Foto bersih disimpan ke galeri.');
 });
 
-el.btnCloseZoom.addEventListener('click', () => {
-  el.photoZoomModal.classList.add('hidden');
-  state.zoomedPhoto = null;
-});
-
 el.toggleAutoComplete.addEventListener('change', async () => {
   state.autoCompleteMode = el.toggleAutoComplete.checked;
   await saveMeta('auto_complete_mode', state.autoCompleteMode);
   showToast(
-    state.autoCompleteMode ? 'Mode Auto-Selesai AKTIF' : 'Mode Konfirmasi Manual AKTIF'
+    state.autoCompleteMode ? 'Mode Auto-Selesai AKTIF' : 'Mode Manual AKTIF'
   );
 });
 

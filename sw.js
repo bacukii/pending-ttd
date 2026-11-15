@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pending-ttd-v1.0.0';
+const CACHE_NAME = 'pending-ttd-v1.0.1';
 const CORE_ASSETS = [
   './',
   './index.html',
