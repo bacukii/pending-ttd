@@ -1,3 +1,7 @@
+const TESSERACT_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+const scriptPromises = new Map();
+let ocrWorkerPromise = null;
+
 // Ekstrak nomor resi J&T dari string mentah QR/Barcode/OCR
 export function extractJntWaybill(rawText) {
   if (!rawText) return '';
@@ -33,51 +37,88 @@ export function extractJntWaybill(rawText) {
 }
 
 function loadExternalScript(src) {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) {
+  if (scriptPromises.has(src)) {
+    return scriptPromises.get(src);
+  }
+
+  const promise = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing && window.Tesseract) {
       resolve();
       return;
     }
+
     const script = document.createElement('script');
     script.src = src;
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Gagal memuat ${src}`));
+    script.onerror = () => {
+      scriptPromises.delete(src);
+      reject(new Error(`Gagal memuat ${src}`));
+    };
     document.head.appendChild(script);
   });
+
+  scriptPromises.set(src, promise);
+  return promise;
+}
+
+async function getOcrWorker() {
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = (async () => {
+      await loadExternalScript(TESSERACT_CDN);
+      if (!window.Tesseract) {
+        throw new Error('Tesseract OCR tidak tersedia offline.');
+      }
+      const worker = await window.Tesseract.createWorker('eng');
+      await worker.setParameters({
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-'
+      });
+      return worker;
+    })().catch((err) => {
+      ocrWorkerPromise = null;
+      throw err;
+    });
+  }
+  return ocrWorkerPromise;
+}
+
+// Preload & cache mesin OCR secara senyap saat online agar siap dipakai saat offline
+export async function preloadOcrEngine() {
+  if (!navigator.onLine) return false;
+  try {
+    await getOcrWorker();
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 // Jalankan OCR pada elemen Canvas atau File Gambar
 export async function runOcrOnImageSource(imageSource) {
-  await loadExternalScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
-  if (!window.Tesseract) throw new Error('Tesseract OCR tidak tersedia offline.');
-
-  const worker = await window.Tesseract.createWorker('eng');
-  try {
-    await worker.setParameters({
-      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-'
-    });
-    const { data } = await worker.recognize(imageSource);
-    const extracted = extractJntWaybill(data.text);
-    return {
-      waybill: extracted,
-      rawText: (data.text || '').trim()
-    };
-  } finally {
-    await worker.terminate();
-  }
+  const worker = await getOcrWorker();
+  const { data } = await worker.recognize(imageSource);
+  const extracted = extractJntWaybill(data.text);
+  return {
+    waybill: extracted,
+    rawText: (data.text || '').trim()
+  };
 }
 
 // Scan Barcode / QR / OCR dari file gambar di Galeri
 export async function scanWaybillFromImageFile(file, onStatus) {
   const bitmap = await createImageBitmap(file);
   const canvas = document.createElement('canvas');
-  const maxDim = 1400;
-  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  try {
+    const maxDim = 1400;
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  } finally {
+    if (bitmap.close) bitmap.close();
+  }
 
   if ('BarcodeDetector' in window) {
     onStatus?.('Membaca barcode/QR dari foto...');
@@ -146,20 +187,28 @@ export async function processPodImage(fileOrBlob, options = {}) {
     includeGps ? getQuickLocationText() : Promise.resolve('')
   ]);
 
-  const maxSide = 1280;
-  const ratio = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-  const width = Math.round(bitmap.width * ratio);
-  const height = Math.round(bitmap.height * ratio);
-
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(bitmap, 0, 0, width, height);
+  try {
+    const maxSide = 1280;
+    const ratio = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const width = Math.round(bitmap.width * ratio);
+    const height = Math.round(bitmap.height * ratio);
+
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, width, height);
+  } finally {
+    if (bitmap.close) bitmap.close();
+  }
 
   const blob = await new Promise((resolve) =>
     canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.82)
   );
+
+  if (!blob) {
+    throw new Error('Gagal mengompresi foto karena keterbatasan memori perangkat.');
+  }
 
   return {
     blob,

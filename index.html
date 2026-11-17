@@ -2,11 +2,17 @@
 <html lang="id" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#dc2626" />
+  <meta name="description" content="Pencatat resi dan foto bukti pengantaran pending TTD untuk kurir" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Pending TTD" />
   <title>Pending TTD</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col select-none antialiased">
@@ -20,7 +26,7 @@
         </div>
         <div>
           <h1 class="text-base font-bold leading-tight">Pending TTD</h1>
-          <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
+          <div role="status" aria-live="polite" class="flex items-center gap-1.5 text-[11px] text-slate-400">
             <span id="netDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
             <span id="netLabel">Siap Offline</span>
           </div>
@@ -59,7 +65,7 @@
           </p>
         </div>
         <label class="relative inline-flex items-center cursor-pointer shrink-0">
-          <input id="toggleLockMode" type="checkbox" class="sr-only peer" />
+          <input id="toggleLockMode" type="checkbox" aria-label="Aktifkan mode lock 1 penerima multi-paket" class="sr-only peer" />
           <div class="w-12 h-7 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
         </label>
       </div>
@@ -79,16 +85,16 @@
 
           <label class="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-700 cursor-pointer active:scale-95 transition">
             <span>Scan dari Galeri</span>
-            <input id="inputScanGallery" type="file" accept="image/*" class="hidden" />
+            <input id="inputScanGallery" type="file" accept="image/*" aria-label="Pilih foto label resi dari galeri" class="hidden" />
           </label>
         </div>
 
-        <p id="galleryScanStatus" class="hidden text-xs text-amber-300 bg-amber-950/50 border border-amber-800/60 rounded-lg px-3 py-2"></p>
+        <p id="galleryScanStatus" role="status" aria-live="polite" class="hidden text-xs text-amber-300 bg-amber-950/50 border border-amber-800/60 rounded-lg px-3 py-2"></p>
 
         <!-- Input Manual & Clipboard -->
         <div class="space-y-2 pt-1">
           <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-400">Input manual / tempel resi</span>
+            <label for="inputManualWaybill" class="text-xs text-slate-400">Input manual / tempel resi</label>
             <button type="button" id="btnPasteWaybill" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs font-semibold text-sky-300 border border-slate-700 active:bg-slate-700">
               Tempel Clipboard
             </button>
@@ -114,19 +120,19 @@
           <span id="draftPhotoCount" class="text-xs font-semibold text-emerald-400">0 Foto</span>
         </div>
 
-        <input id="inputRecipient" type="text" placeholder="Nama penerima / patokan rumah (opsional)"
+        <input id="inputRecipient" type="text" aria-label="Nama penerima atau patokan rumah" placeholder="Nama penerima / patokan rumah (opsional)"
           class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500" />
 
         <!-- Tombol Kamera Langsung & Upload Galeri -->
         <div class="grid grid-cols-2 gap-2.5">
           <label class="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm cursor-pointer shadow-lg shadow-emerald-950/40 active:scale-95 transition">
             <span>Ambil Foto Kamera</span>
-            <input id="inputCameraPhoto" type="file" accept="image/*" capture="environment" class="hidden" />
+            <input id="inputCameraPhoto" type="file" accept="image/*" capture="environment" aria-label="Ambil foto penerima dengan kamera" class="hidden" />
           </label>
 
           <label class="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-semibold text-sm border border-slate-700 cursor-pointer active:scale-95 transition">
             <span>Pilih dari Galeri</span>
-            <input id="inputGalleryPhoto" type="file" accept="image/*" class="hidden" />
+            <input id="inputGalleryPhoto" type="file" accept="image/*" aria-label="Pilih foto penerima dari galeri" class="hidden" />
           </label>
         </div>
 
@@ -160,12 +166,12 @@
             <span class="text-[11px] text-slate-400">Otomatis pindah ke Selesai saat semua resi penerima disalin</span>
           </div>
           <label class="relative inline-flex items-center cursor-pointer shrink-0">
-            <input id="toggleAutoComplete" type="checkbox" class="sr-only peer" />
+            <input id="toggleAutoComplete" type="checkbox" aria-label="Aktifkan mode auto-selesai setelah salin resi" class="sr-only peer" />
             <div class="w-11 h-6 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
           </label>
         </div>
 
-        <input id="inputSearchResi" type="search" placeholder="Cari nomor resi atau nama penerima..."
+        <input id="inputSearchResi" type="search" aria-label="Cari nomor resi atau nama penerima" placeholder="Cari nomor resi atau nama penerima..."
           class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500" />
       </div>
 
@@ -176,7 +182,7 @@
   </main>
 
   <!-- Modal Live Scanner -->
-  <div id="scannerModal" class="hidden fixed inset-0 z-50 bg-black flex flex-col">
+  <div id="scannerModal" role="dialog" aria-modal="true" aria-label="Scanner Barcode dan QR Resi" class="hidden fixed inset-0 z-50 bg-black flex flex-col">
     <div class="flex items-center justify-between px-4 py-3 bg-slate-900/90 border-b border-slate-800">
       <div>
         <h3 class="text-sm font-bold text-white">Scan Barcode / QR Resi</h3>
@@ -219,7 +225,7 @@
   </div>
 
   <!-- Modal Zoom Foto + Overlay Info Waktu & GPS -->
-  <div id="photoZoomModal" class="hidden fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-4">
+  <div id="photoZoomModal" role="dialog" aria-modal="true" aria-label="Pratinjau Foto Penerima" class="hidden fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-4">
     <div class="flex items-center justify-between gap-2">
       <button id="btnDownloadZoomed" type="button"
         class="px-3.5 py-1.5 rounded-xl bg-slate-800 text-xs font-semibold text-sky-300 border border-slate-700 active:scale-95 transition">
@@ -236,7 +242,7 @@
   </div>
 
   <!-- Toast Notifikasi + Undo -->
-  <div id="toastBar" class="hidden fixed bottom-20 inset-x-4 max-w-lg mx-auto z-40 bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3">
+  <div id="toastBar" role="status" aria-live="polite" class="hidden fixed bottom-20 inset-x-4 max-w-lg mx-auto z-40 bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3">
     <span id="toastMessage" class="text-xs font-medium"></span>
     <button id="btnToastUndo" type="button" class="hidden px-3 py-1 rounded-lg bg-amber-500 text-slate-950 text-xs font-extrabold shrink-0">
       Urungkan
@@ -244,7 +250,7 @@
   </div>
 
   <!-- Bottom Navigation Bar -->
-  <nav class="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 backdrop-blur border-t border-slate-800">
+  <nav aria-label="Navigasi utama" class="fixed bottom-0 inset-x-0 z-30 bg-slate-900/95 backdrop-blur border-t border-slate-800">
     <div class="max-w-lg mx-auto grid grid-cols-3">
       <button type="button" data-tab="INPUT"
         class="nav-tab py-3 flex flex-col items-center gap-0.5 text-red-400 font-bold text-xs border-t-2 border-red-500">

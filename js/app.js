@@ -10,6 +10,7 @@ import {
 } from './db.js';
 import {
   extractJntWaybill,
+  preloadOcrEngine,
   runOcrOnImageSource,
   scanWaybillFromImageFile,
   processPodImage,
@@ -110,21 +111,54 @@ const el = {
   btnToastUndo: document.getElementById('btnToastUndo')
 };
 
-// --- Utilitas Feedback & Toast ---
+// --- Utilitas AudioContext Singleton, Clipboard Aman & Toast ---
+let sharedAudioCtx = null;
+
 function triggerFeedback() {
   if (navigator.vibrate) navigator.vibrate(60);
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new AudioCtx();
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
+    const osc = sharedAudioCtx.createOscillator();
+    const gain = sharedAudioCtx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(1040, ctx.currentTime);
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    osc.frequency.setValueAtTime(1040, sharedAudioCtx.currentTime);
+    gain.gain.setValueAtTime(0.12, sharedAudioCtx.currentTime);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(sharedAudioCtx.destination);
     osc.start();
-    osc.stop(ctx.currentTime + 0.09);
+    osc.stop(sharedAudioCtx.currentTime + 0.09);
   } catch (_) {}
+}
+
+async function copyTextSafe(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (_) {}
+
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch (_) {
+    return false;
+  }
 }
 
 function showToast(message, undoCallback = null) {
@@ -153,18 +187,70 @@ el.btnToastUndo.addEventListener('click', async () => {
 });
 
 // --- Status Jaringan & Service Worker ---
+function scheduleOcrWarmup() {
+  if (!navigator.onLine) return;
+  const run = () => {
+    preloadOcrEngine();
+  };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(run, { timeout: 4000 });
+  } else {
+    setTimeout(run, 2000);
+  }
+}
+
 function updateNetworkStatus() {
   const online = navigator.onLine;
   el.netDot.className = `w-2 h-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-amber-400'}`;
   el.netLabel.textContent = online ? 'Online • Offline Ready' : 'Mode Offline Lokal';
+  if (online) {
+    scheduleOcrWarmup();
+  }
 }
 
 window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    updateNetworkStatus();
+  }
+});
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch((err) => {
-    console.warn('SW gagal terdaftar:', err);
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('./sw.js')
+      .then((reg) => {
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              const hasActiveWork =
+                Boolean(state.scannerStream) ||
+                state.draft.waybills.length > 0 ||
+                state.draft.photos.length > 0;
+
+              if (hasActiveWork) {
+                showToast('Pembaruan aplikasi siap setelah draf disimpan.');
+              } else {
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+              }
+            }
+          });
+        });
+      })
+      .catch((err) => {
+        console.warn('SW gagal terdaftar:', err);
+      });
+
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
   });
 }
 
@@ -276,7 +362,7 @@ function renderDraftUI() {
           <span class="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[10px] font-bold text-white">
             #${idx + 1} • ${jam}
           </span>
-          <button type="button" data-remove-photo-idx="${idx}"
+          <button type="button" data-remove-photo-idx="${idx}" aria-label="Hapus foto ke-${idx + 1}"
             class="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-600/90 text-white text-xs font-black flex items-center justify-center shadow">
             ×
           </button>
@@ -469,30 +555,34 @@ async function handlePodPhotosSelection(fileList, isFromGallery) {
 
   showToast(`Menyimpan ${files.length} foto...`);
 
-  const processedItems = [];
-  for (const file of files) {
-    const captureTime = isFromGallery && file.lastModified ? file.lastModified : Date.now();
-    const processed = await processPodImage(file, {
-      captureTimestamp: captureTime,
-      includeGps: !isFromGallery
-    });
-    processedItems.push({
-      id: crypto.randomUUID(),
-      blob: processed.blob,
-      timestamp: processed.timestamp,
-      gpsText: processed.gpsText
-    });
-  }
+  try {
+    const processedItems = [];
+    for (const file of files) {
+      const captureTime = isFromGallery && file.lastModified ? file.lastModified : Date.now();
+      const processed = await processPodImage(file, {
+        captureTimestamp: captureTime,
+        includeGps: !isFromGallery
+      });
+      processedItems.push({
+        id: crypto.randomUUID(),
+        blob: processed.blob,
+        timestamp: processed.timestamp,
+        gpsText: processed.gpsText
+      });
+    }
 
-  if (state.lockMode) {
-    state.draft.photos.push(...processedItems);
-  } else {
-    state.draft.photos = [processedItems[0]];
-  }
+    if (state.lockMode) {
+      state.draft.photos.push(...processedItems);
+    } else {
+      state.draft.photos = [processedItems[0]];
+    }
 
-  renderDraftUI();
-  await persistDraftState();
-  showToast(`${state.draft.photos.length} foto siap disimpan.`);
+    renderDraftUI();
+    await persistDraftState();
+    showToast(`${state.draft.photos.length} foto siap disimpan.`);
+  } catch (err) {
+    showToast(err.message || 'Gagal memproses foto.');
+  }
 }
 
 el.inputCameraPhoto.addEventListener('change', (e) => {
@@ -853,7 +943,12 @@ el.groupCardsContainer.addEventListener('click', async (e) => {
     const waybillObj = group.waybills[idx];
     if (!waybillObj) return;
 
-    await navigator.clipboard.writeText(waybillObj.code);
+    const copiedOk = await copyTextSafe(waybillObj.code);
+    if (!copiedOk) {
+      showToast('Gagal menyalin resi ke clipboard.');
+      return;
+    }
+
     waybillObj.copied = true;
     state.activeGroupId = group.id;
     await saveMeta('last_active_group_id', group.id);
@@ -940,8 +1035,12 @@ el.btnExportText.addEventListener('click', async () => {
   });
   lines.push(`\nTotal: ${totalPaket} Paket (${pending.length} Penerima)`);
 
-  await navigator.clipboard.writeText(lines.join('\n'));
-  showToast(`Rekap ${totalPaket} resi disalin ke clipboard!`);
+  const copiedOk = await copyTextSafe(lines.join('\n'));
+  showToast(
+    copiedOk
+      ? `Rekap ${totalPaket} resi disalin ke clipboard!`
+      : 'Gagal menyalin rekap ke clipboard.'
+  );
 });
 
 // --- Navigasi Tab ---
